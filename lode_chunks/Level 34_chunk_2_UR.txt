@@ -1,0 +1,11 @@
+L-------bbLLG---
+L--------bLLLG--
+L--------bLLLLG-
+L--------bbLLLLG
+L---------bbLLLL
+L----------bbbLL
+L------------bbb
+L--M------E--bbb
+bbbbbbbbbbbL----
+-----------L----
+-----------L----

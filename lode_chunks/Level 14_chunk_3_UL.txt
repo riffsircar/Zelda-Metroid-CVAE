@@ -1,0 +1,11 @@
+--RLR------R-L-R
+-R-R-R----R--L-R
+R--R--R--R---L-R
+---R---RR-R--L-R
+R--R---R---R-L-R
+-R--R-R-----RL-R
+--R--RG------L-R
+---R--R-R----LGR
+R---RR-R-RR-RLR-
+-R-----------L--
+--GM---------L--

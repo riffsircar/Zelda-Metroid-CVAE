@@ -1,0 +1,11 @@
+L------Rbbbbbbbb
+L-------bbGGGGbb
+L-------bbbbbbbb
+L-------bbbbbbGG
+L-------bbbbbbbb
+L------R-bbbbbbb
+L------R-bbbbbbb
+L------R--bGGGGb
+L------RR--bbbbb
+LE-GGGGRRRG--bbb
+bbbbbbbbbbbLGGGG
