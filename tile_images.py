@@ -17,7 +17,6 @@ met_images = {
     "v":Image.open('tiles/0.png')  # ??
 }
 
-
 mm_images = {
     "#":Image.open('tiles/MM_X2.png'),
     "*":Image.open('tiles/MM_star.png'),
@@ -37,7 +36,6 @@ mm_images = {
     "w":Image.open('tiles/MM_w.png'),
     "|":Image.open('tiles/LMM.png')
 }
-
 
 # {'B': 0, 'D': 1, 'F': 2, 'I': 3, 'M': 4, 'O': 5, 'P': 6, 'S': 7, 'W': 8}
 zelda_images = {
@@ -116,4 +114,4 @@ def common(g1,g2):
         if k in g2:
             print(k)
 
-#common(zelda_images, lode_images)
+common(zelda_images, met_images)
