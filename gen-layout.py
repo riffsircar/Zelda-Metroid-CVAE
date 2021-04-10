@@ -13,7 +13,7 @@ import torchvision.utils as vutils
 from torch.autograd import Variable
 import numpy as np
 import matplotlib.pyplot as plt
-from PIL import Image
+from PIL import Image, ImageDraw
 from model_lin_cond import get_cond_model, load_cond_model
 from torch.utils.data import DataLoader, Dataset, TensorDataset
 from util import *
@@ -302,8 +302,14 @@ if GAME == 'mm':
         label = get_label_tensor(label)
         segment = get_segment_from_zc(model,z,label)
         img = get_image_from_segment(segment)
+        draw = ImageDraw.Draw(img)
+        
         x, y = key
-        layout_img.paste(img, ((x*256)+x_adj,(y*dims[0]*dims[1])+y_adj))
+        x_pos, y_pos = (x*256)+x_adj, (y*dims[0]*dims[1])+y_adj
+        draw.rectangle((x_pos,y_pos,x_pos+(dims[1]*16),y_pos+(dims[0]*16)),outline=(255,255,255))
+        #draw.rectangle(((x*256)+x_adj, (y*dims[0]*dims[1])+y_adj))
+        #layout_img.paste(img, ((x*256)+x_adj,(y*dims[0]*dims[1])+y_adj))
+        layout_img.paste(img, (x_pos,y_pos))
         print(x, y, '\t', (x*256)+x_adj, (y*dims[0]*dims[1])+y_adj, '\t', label, '\t', dir)
         print('\n'.join(segment),'\n')
     layout_img.save('layout_' + GAME + '_' + str(latent_dim) + '.png')
@@ -404,6 +410,7 @@ print(width, height)
 print(x_adj, y_adj)
 #sys.exit()
 layout_img = Image.new('RGB',(width*256, height*(dims[0]*dims[1])))
+draw = ImageDraw.Draw(layout_img)
 #img.save('test.png')
 
 met_prob, zel_prob, mm_prob = args.met, args.zel, args.mm
@@ -443,7 +450,17 @@ for key in layout:
             segment = pad_zelda(segment)
         img = get_image_from_segment(segment,this_game)
     x, y = key
-    layout_img.paste(img, ((x*256)+x_adj,(y*dims[0]*dims[1])+y_adj))
+    x_pos, y_pos, x_del, y_del = (x*256)+x_adj, (y*dims[0]*dims[1])+y_adj, dims[1]*16, dims[0]*16
+    print('xp: ', x_pos, ' yp: ', y_pos)
+    
+    
+    #layout_img.paste(img, ((x*256)+x_adj,(y*dims[0]*dims[1])+y_adj))
+    layout_img.paste(img, (x_pos,y_pos))
+    #draw.rectangle((x_pos,y_pos,x_pos+x_del,y_pos+y_del),outline=(255,255,255))
+    draw.line(((x_pos,y_pos),(x_pos+x_del,y_pos)),width=3)  # up
+    draw.line(((x_pos,y_pos+y_del),(x_pos+x_del,y_pos+y_del)),width=3)  # down
+    draw.line(((x_pos,y_pos),(x_pos, y_pos+y_del)),width=3)  # left
+    draw.line(((x_pos+x_del,y_pos),(x_pos+x_del,y_pos+y_del)),width=3)  # right
     print(x, y, '\t', (x*256)+x_adj, (y*dims[0]*dims[1])+y_adj)
     print('\n'.join(segment),'\n')
     layout_segments[key] = segment

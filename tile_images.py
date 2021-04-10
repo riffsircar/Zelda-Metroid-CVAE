@@ -114,4 +114,4 @@ def common(g1,g2):
         if k in g2:
             print(k)
 
-common(zelda_images, met_images)
+common(mm_images, zelda_images)
