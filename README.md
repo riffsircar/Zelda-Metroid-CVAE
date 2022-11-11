@@ -1,4 +1,4 @@
-# PCGBT
+# Generating and Blending Dungeons and Platformers using CVAEs
 
 (Partial) Code for Dungeon and Platformer Level Blending and Generation using Conditional VAEs, COG 2021
 
