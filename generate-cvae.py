@@ -1,24 +1,9 @@
-from __future__ import print_function
 import argparse, random, torch, os, math, json, sys, re
-import torch.nn as nn
-import torch.nn.functional as F
-import torch.nn.parallel
-import torch.backends.cudnn as cudnn
 import torch.optim as optim
 import torch.utils.data
-import torchvision.datasets as dset
-import torchvision.transforms as transforms
-from torchvision.utils import save_image
-import torchvision.utils as vutils
-from torch.autograd import Variable
 import numpy as np
-import matplotlib.pyplot as plt
 from PIL import Image
 from model_lin_cond import get_cond_model, load_cond_model
-from model_lin import get_model, load_model
-from torch.utils.data import DataLoader, Dataset, TensorDataset
-from sklearn.model_selection import train_test_split
-from sklearn import metrics
 import pickle
 
 device = torch.device('cuda')
@@ -275,7 +260,7 @@ def get_segment_from_zc(z,c):
 
 def get_z_from_segment(segment):
     out = []
-    for l in level:
+    for l in segment:
         l = list(l)
         l_map = [char2int[x] for x in l]
         out.append(l_map)
@@ -286,11 +271,11 @@ def get_z_from_segment(segment):
     out = torch.DoubleTensor(out_onehot)
     out = out.to(device)
     out_lin = out.view(out.size(0),-1)
-    z, _, _ = vae.encoder.encode(out_lin)
+    z, _, _ = model.encoder.encode(out_lin)
     return z
 
 def get_segment_from_z(z):
-    level = vae.decoder.decode(z)
+    level = model.decoder.decode(z)
     level = level.reshape(level.size(0),num_tiles,dims[0],dims[1])
     im = level.data.cpu().numpy()
     im = np.argmax(im, axis=1).squeeze(0)

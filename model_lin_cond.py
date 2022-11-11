@@ -1,6 +1,5 @@
 import torch.nn as nn
 import torch.optim
-from torch.nn import DataParallel
 import torch.nn.functional as F
 
 class Flatten(nn.Module):

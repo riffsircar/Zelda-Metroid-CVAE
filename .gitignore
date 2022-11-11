@@ -16,3 +16,8 @@ layouts/
 
 # output folders
 out*
+*.csv
+*.xlsx
+*.png
+
+models_large/

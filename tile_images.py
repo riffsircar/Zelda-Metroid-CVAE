@@ -39,15 +39,15 @@ mm_images = {
 
 # {'B': 0, 'D': 1, 'F': 2, 'I': 3, 'M': 4, 'O': 5, 'P': 6, 'S': 7, 'W': 8}
 zelda_images = {
-   "B":Image.open('tiles/Z_B.png'),
-   "D":Image.open('tiles/DMM.png'),
-   "F":Image.open('tiles/Z_F.png'),
-   "I":Image.open('tiles/Z_I.png'),
-   "M":Image.open('tiles/Z_M.png'),
-   "O":Image.open('tiles/Z_O.png'),
-   "P":Image.open('tiles/Z_P.png'),
-   "S":Image.open('tiles/Z_S.png'),
-   "W":Image.open('tiles/Z_W.png')
+   "B":Image.open('tiles/Z_B.png'), # block
+   "D":Image.open('tiles/DMM.png'), # door
+   "F":Image.open('tiles/Z_F.png'), # floor
+   "I":Image.open('tiles/Z_I.png'), # elemental block
+   "M":Image.open('tiles/Z_M.png'), # statue/monster
+   "O":Image.open('tiles/Z_O.png'), # elemental floor
+   "P":Image.open('tiles/Z_P.png'), # pond/lava
+   "S":Image.open('tiles/Z_S.png'), # stairs
+   "W":Image.open('tiles/Z_W.png')  # wall
 }
 # {'-': 0, 'B': 1, 'E': 2, 'G': 3, 'L': 4, 'M': 5, 'R': 6, 'b': 7}
 lode_images = {
@@ -109,9 +109,116 @@ bzl_images = {
     'N':Image.open('tiles/LR_M.png'), # spawn point   # N for blend
 }
 
+bzmet_images = {
+    # zelda
+    "K":Image.open('tiles/Z_B.png'),
+    #"D":Image.open('tiles/DMM.png'),
+    "F":Image.open('tiles/Z_F.png'),
+    "I":Image.open('tiles/Z_I.png'),
+    "M":Image.open('tiles/Z_M.png'),
+    "O":Image.open('tiles/Z_O.png'),
+    "P":Image.open('tiles/Z_P.png'),
+    "S":Image.open('tiles/Z_S.png'),
+    "W":Image.open('tiles/Z_W.png'),
+
+    # met
+    "#":Image.open('tiles/Met_X.png'),  # solid
+    "(":Image.open('tiles/0.png'),  # beam around door (ignore using background)
+    ")":Image.open('tiles/0.png'),  # beam around door (ignore using background)
+    "+":Image.open('tiles/Met_+.png'),  # powerup
+    "-":Image.open('tiles/0.png'),   # background
+    "B":Image.open('tiles/Met_B.png'),  # breakable
+    "D":Image.open('tiles/Met_D.png'),  # door
+    "E":Image.open('tiles/Met_E.png'),  # enemy
+    #"P":Image.open('tiles/0.png'),   # path
+    "[":Image.open('tiles/Met_[.png'),  # ??
+    "]":Image.open('tiles/Met_].png'),  # ??
+    "^":Image.open('tiles/Met_^2.png'),  # lava
+    "v":Image.open('tiles/0.png')  # ??
+}
+
+bzmm_images = {
+    # zelda
+    "K":Image.open('tiles/Z_B.png'),
+    #"D":Image.open('tiles/DMM.png'),
+    "F":Image.open('tiles/Z_F.png'),
+    "I":Image.open('tiles/Z_I.png'),
+    "M":Image.open('tiles/Z_M.png'),
+    "O":Image.open('tiles/Z_O.png'),
+    "P":Image.open('tiles/Z_P.png'),
+    "S":Image.open('tiles/Z_S.png'),
+    "W":Image.open('tiles/Z_W.png'),
+
+    # mm
+    "#":Image.open('tiles/MM_X2.png'),
+    "*":Image.open('tiles/MM_star.png'),
+    "+":Image.open('tiles/MM_+.png'),
+    "-":Image.open('tiles/-.png'),
+    "B":Image.open('tiles/MM_B2.png'),
+    "C":Image.open('tiles/CMM.png'),
+    "D":Image.open('tiles/DMM.png'),
+    "H":Image.open('tiles/HMM.png'),
+    "L":Image.open('tiles/MM_L.png'),
+    "m":Image.open('tiles/MMM.png'),
+    #"P":Image.open('tiles/-.png'),
+    "U":Image.open('tiles/MM_U.png'),
+    "w":Image.open('tiles/MM_w.png'),
+    "l":Image.open('tiles/MM_L.png'),
+    "t":Image.open('tiles/TMM.png'),
+    "w":Image.open('tiles/MM_w.png'),
+    "|":Image.open('tiles/LMM.png')
+}
+
+bzmetmm_images = {
+    # zelda
+    "K":Image.open('tiles/Z_B.png'),
+    #"D":Image.open('tiles/DMM.png'),
+    "F":Image.open('tiles/Z_F.png'),
+    "I":Image.open('tiles/Z_I.png'),
+    "M":Image.open('tiles/Z_M.png'),
+    "O":Image.open('tiles/Z_O.png'),
+    "P":Image.open('tiles/Z_P.png'),
+    "S":Image.open('tiles/Z_S.png'),
+    "W":Image.open('tiles/Z_W.png'),
+
+    # met
+    "#":Image.open('tiles/Met_X.png'),  # solid
+    "(":Image.open('tiles/0.png'),  # beam around door (ignore using background)
+    ")":Image.open('tiles/0.png'),  # beam around door (ignore using background)
+    "+":Image.open('tiles/Met_+.png'),  # powerup
+    "-":Image.open('tiles/0.png'),   # background
+    "B":Image.open('tiles/Met_B.png'),  # breakable
+    "D":Image.open('tiles/Met_D.png'),  # door
+    "E":Image.open('tiles/Met_E.png'),  # enemy
+    #"P":Image.open('tiles/0.png'),   # path
+    "[":Image.open('tiles/Met_[.png'),  # ??
+    "]":Image.open('tiles/Met_].png'),  # ??
+    "^":Image.open('tiles/Met_^2.png'),  # lava
+    "v":Image.open('tiles/0.png'),  # ??    
+
+    # mm
+    #"#":Image.open('tiles/MM_X2.png'),
+    "*":Image.open('tiles/MM_star.png'),
+    #"+":Image.open('tiles/MM_+.png'),
+    #"-":Image.open('tiles/-.png'),
+    #"B":Image.open('tiles/MM_B2.png'),
+    "C":Image.open('tiles/CMM.png'),
+    #"D":Image.open('tiles/DMM.png'),
+    "H":Image.open('tiles/HMM.png'),
+    "L":Image.open('tiles/MM_L.png'),
+    "m":Image.open('tiles/MMM.png'),
+    #"P":Image.open('tiles/-.png'),
+    "U":Image.open('tiles/MM_U.png'),
+    "w":Image.open('tiles/MM_w.png'),
+    "l":Image.open('tiles/MM_L.png'),
+    "t":Image.open('tiles/TMM.png'),
+    "w":Image.open('tiles/MM_w.png'),
+    "|":Image.open('tiles/LMM.png')
+}
+
 def common(g1,g2):
     for k in g1:
         if k in g2:
             print(k)
 
-common(mm_images, zelda_images)
+common(met_images, mm_images)

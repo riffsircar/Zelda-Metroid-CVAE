@@ -1,21 +1,8 @@
-from __future__ import print_function
-import argparse, random, torch, os, math, json, sys, re, pickle
-import torch.nn as nn
-import torch.nn.functional as F
-import torch.nn.parallel
-import torch.backends.cudnn as cudnn
-import torch.optim as optim
+import argparse, random, torch, os, math, json, sys
 import torch.utils.data
-import torchvision.datasets as dset
-import torchvision.transforms as transforms
-from torchvision.utils import save_image
-import torchvision.utils as vutils
-from torch.autograd import Variable
 import numpy as np
-import matplotlib.pyplot as plt
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, ImageFont
 from model_lin_cond import get_cond_model, load_cond_model
-from torch.utils.data import DataLoader, Dataset, TensorDataset
 from util import *
 from tile_images import *
 
@@ -29,12 +16,14 @@ parser.add_argument('--door-pct', type=int, help='Percent chance of door when th
 parser.add_argument('--min-rooms', type=int, help='Minimum rooms. (default: %(default)s)', default=5)
 parser.add_argument('--max-rooms', type=int, help='Maximum rooms.(default: %(default)s)', default=20)
 parser.add_argument('--json', action='store_true', help='Output JSON. (default: false)')
-parser.add_argument('--game', type=str, help='Game (options: met, mm, lode, zelda, blend_met_mm, blend_zelda_lode)', default='met')
+parser.add_argument('--game', type=str, help='Game (options: met, mm, lode, zelda, blend_met_mm, blend_zelda_lode, blend_zelda_met, blend_zelda_mm, blend_zelda_met_mm)', default='met')
 parser.add_argument('--ld', type=int, help='Latent dimension size', default=8)
 parser.add_argument('--multi', action='store_true', help='Use multiple models (default: false)')
 parser.add_argument('--met', type=float, help='met prob', default=0.33)
-parser.add_argument('--zel', type=float, help='met prob', default=0.33)
-parser.add_argument('--mm', type=float, help='met prob', default=0.33)
+parser.add_argument('--zel', type=float, help='zelda prob', default=0.33)
+parser.add_argument('--mm', type=float, help='mm prob', default=0.33)
+parser.add_argument('--lode', type=float, help='lode prob', default=0.33)
+parser.add_argument('--nolines', action='store_true',help='No lines (default:false)')
 args = parser.parse_args()
 
 device = torch.device('cpu')
@@ -50,10 +39,29 @@ mm_folder = 'mm_chunks_all/'
 
 folders = {'zelda':zelda_folder, 'met':met_folder, 'lode':lode_folder, 'mm':mm_folder}
 out_folders = {'zelda':'out_zelda/','met':'out_met/','lode':'out_lode/','mm':'out_mm/'}
-all_images = {'met':met_images, 'lode':lode_images, 'zelda':zelda_images, 'mm':mm_images, 'blend_met_mm':bmm_images, 'blend_zelda_lode':bzl_images}
+all_images = {'met':met_images, 'lode':lode_images, 'zelda':zelda_images, 'mm':mm_images, 'blend_met_mm':bmm_images, 'blend_zelda_lode':bzl_images,'blend_zelda_met':bzmet_images,'blend_zelda_mm':bzmm_images,'blend_zelda_met_mm':bzmetmm_images}
 images = all_images[GAME]
 folder = folders[GAME] if 'blend' not in GAME else None
-label_size = 4 if 'blend' not in GAME else 6
+if GAME == 'blend_zelda_met_mm':
+    label_size = 7
+elif 'blend' in GAME:
+    label_size = 6
+else:
+    label_size = 4
+print(label_size)
+met_prob, zel_prob, mm_prob, lode_prob = args.met, args.zel, args.mm, args.lode
+
+g1, g2 = None, None
+if GAME == 'blend_zelda_met':
+    g1, g2 = met_prob, zel_prob
+elif GAME == 'blend_zelda_mm':
+    g1, g2 = mm_prob, zel_prob
+elif GAME == 'blend_zelda_met_mm':
+    g1, g2, g3 = met_prob, mm_prob, zel_prob
+elif GAME == 'blend_zelda_lode':
+    g1, g2 = zel_prob, lode_prob
+elif GAME == 'blend_met_mm':
+    g1, g2 = met_prob, mm_prob
 
 NORTH  = 'north'
 SOUTH  = 'south'
@@ -132,30 +140,11 @@ if not GAME.startswith('blend'):
     text = text.replace('\n','')
     print(len(levels),len(dirs))
 
-"""
-def pad_zelda(segment):
-    padded = []
-    padded.append('W' * 16)  # outer north wall
-    #padded.append('W' * 16)  # wall pad
-    padded.append(segment[1])  # inner north wall of original segment that may/may not have doors
-    padded.append(segment[2])  # outer floor area north pad
-    padded.append(segment[2])  # outer floor area north pad
-    padded.extend(segment[2:-2])  # rest of segment
-    padded.append(segment[-3])  # outer floor area south pad
-    padded.append(segment[-3])  # outer floor area south pad
-    padded.append(segment[-2])  # inner south wall of original segment that may/may not have doors
-    #padded.append('W' * 16)  # wall pad
-    padded.append('W' * 16)  # outer south wall
-    print(len(padded))
-    print('\n'.join(padded))
-    print('\n','\n'.join(segment))
-    return padded
-"""
 #chars = sorted(list(set(text.strip('\n'))))
 #int2char = dict(enumerate(chars))
 #char2int = {ch: ii for ii, ch in int2char.items()}
 char2int, int2chars = char2ints[GAME], {}
-for g in ['met','mm','zelda','lode']:
+for g in ['met','mm','zelda','lode','blend_zelda_lode','blend_met_mm','blend_zelda_met','blend_zelda_mm','blend_zelda_met_mm']:
     c2i = char2ints[g]
     i2c = {ch: ii for ii, ch in c2i.items()}
     int2chars[g] = i2c
@@ -177,7 +166,7 @@ if args.multi:
         input_dim = 240 if 'met' in game or 'mm' in game else 176
         num_tiles = len(char2ints[game])
         model_name = 'models/cvae_lean_' + game + '_ld_' + str(latent_dim) + '_final.pth'
-        game_model = load_cond_model(model_name,input_dim,num_tiles,latent_dim,label_size,device)
+        game_model = load_cond_model(model_name,input_dim,num_tiles,latent_dim,4,device)
         game_model.eval()
         game_model.to(device)
         models[game] = game_model
@@ -213,14 +202,104 @@ def opposite(dr):
     else:
         raise RuntimeError('invalid direction')
 
+def draw_lines(img,x,y,x_adj,y_adj,label):
+    line_width=5
+    dir_label = None
+    if len(label) > 4:
+        if len(label) == 6:
+            gl = 2
+            dir_label = label[2:]
+        else:
+            gl = 3
+            dir_label = label[3:]
+        dirs = ''
+        if dir_label[0] == 1:
+            dirs += 'U'
+        if dir_label[1] == 1:
+            dirs += 'D'
+        if dir_label[2] == 1:
+            dirs += 'L'
+        if dir_label[3] == 1:
+            dirs += 'R'
+    x_pos, y_pos, x_del, y_del = (x*256)+x_adj, (y*dims[0]*dims[1])+y_adj, dims[1]*16, dims[0]*16
+    draw = ImageDraw.Draw(img)
+    font = ImageFont.truetype('arial.ttf',size=25)
+    draw.line(((x_pos,y_pos),(x_pos+x_del,y_pos)),width=line_width)  # up
+    draw.line(((x_pos,y_pos+y_del),(x_pos+x_del,y_pos+y_del)),width=line_width)  # down
+    draw.line(((x_pos,y_pos),(x_pos, y_pos+y_del)),width=line_width)  # left
+    draw.line(((x_pos+x_del,y_pos),(x_pos+x_del,y_pos+y_del)),width=line_width)  # right
+    #if dir_label:
+        #draw.text((x_pos+(x_del/2.5),y_pos+(y_del/2.5)),str(label[:gl]) + '\n' + dirs,font=font,fill=(255,255,255,240),align='center',stroke_width=1)
+    #    draw.text((x_pos+(x_del/2.5),y_pos+(y_del/2.5)),str(label[:gl]),font=font,fill=(255,255,255,240),align='center',stroke_width=1)
+    #else:
+    #    draw.text((x_pos+(x_del/5),y_pos+(y_del/2)),str(label),font=font,fill=(255,255,255,240),align='center',stroke_width=1)
+    # doors/openings
+    """
+    if label[0] == 1:  # up
+        draw.line((((x_pos+(x_del/3),y_pos),(x_pos+(x_del/1.5),y_pos))),width=line_width,fill=(255,0,0))
+    if label[1] == 1:
+        draw.line((((x_pos+(x_del/3),y_pos+y_del),(x_pos+(x_del/1.5),y_pos+y_del))),width=line_width,fill=(255,0,0))
+    if label[2] == 1:
+        draw.line((((x_pos,y_pos+(y_del/3)),(x_pos,y_pos+(y_del/1.5)))),width=line_width,fill=(255,0,0))
+    if label[3] == 1:
+        draw.line((((x_pos+x_del,y_pos+(y_del/3)),(x_pos+x_del,y_pos+(y_del/1.5)))),width=line_width,fill=(255,0,0))
+    """
+
+#draw_dirs(layout_img, xys, labels, imgs)
+def draw_dirs(img, locs, labels):
+    line_width=5
+    draw = ImageDraw.Draw(img)
+    x_del, y_del = dims[1]*16, dims[0]*16
+    for (x_pos,y_pos),label in zip(locs,labels):
+        dir_label = None
+        if len(label) > 4:
+            if len(label) == 6:
+                gl = 2
+                dir_label = label[2:]
+            else:
+                gl = 3
+                dir_label = label[3:]
+            dirs = ''
+            if dir_label[0] == 1:
+                dirs += 'U'
+            if dir_label[1] == 1:
+                dirs += 'D'
+            if dir_label[2] == 1:
+                dirs += 'L'
+            if dir_label[3] == 1:
+                dirs += 'R'
+               
+        if dir_label:
+            label = dir_label
+        if label[0] == 1:  # up
+            draw.line((((x_pos+(x_del/3),y_pos),(x_pos+(x_del/1.5),y_pos))),width=line_width,fill=(255,0,0))
+        if label[1] == 1:
+            draw.line((((x_pos+(x_del/3),y_pos+y_del),(x_pos+(x_del/1.5),y_pos+y_del))),width=line_width,fill=(255,0,0))
+        if label[2] == 1:
+            draw.line((((x_pos,y_pos+(y_del/3)),(x_pos,y_pos+(y_del/1.5)))),width=line_width,fill=(255,0,0))
+        if label[3] == 1:
+            draw.line((((x_pos+x_del,y_pos+(y_del/3)),(x_pos+x_del,y_pos+(y_del/1.5)))),width=line_width,fill=(255,0,0))
+
 if args.no_door_ns and args.no_open_ns and args.no_door_ew and args.no_open_ew:
     raise RuntimeError('no way to connect')
 
+"""
+input_levels, input_text, input_dirs = parse_folder(folder,GAME,True)
+inputs = []
+for level in input_levels:
+	level_str = [''.join(l) for l in level]
+	inputs.append(level_str)
+#idx = 3
+#img = get_image_from_segment(inputs[idx])
+#img.save(GAME + str(latent_dim) + '_' + str(idx) + '_' + input_dirs[idx] + '_test.png')
+#img.save(GAME + str(latent_dim) + '_' + str(idx) + '_test.png')
+#sys.exit()
+"""
 rooms = random.randint(args.min_rooms, args.max_rooms)
-if GAME == 'mm':
+if GAME == 'mmsad':
     segments = random.randint(10,15)
     prev = None
-    if random.random() < 0.75:
+    if random.random() < 0.8:
         dirs = ['right']
     else:
         dirs = ['up']
@@ -242,6 +321,7 @@ if GAME == 'mm':
     print(dirs)
     
     layout, x, y = {}, 0, 0
+    imgs, labels, xys = [], [], []
     for i, dir in enumerate(dirs):
         label = [0] * 4
         if i == 0:
@@ -299,24 +379,37 @@ if GAME == 'mm':
     for key in layout:
         z = sample_z()
         label, dir = layout[key]
-        label = get_label_tensor(label)
-        segment = get_segment_from_zc(model,z,label)
+        label_tensor = get_label_tensor(label)
+        segment = get_segment_from_zc(model,z,label_tensor)
         img = get_image_from_segment(segment)
         draw = ImageDraw.Draw(img)
-        
         x, y = key
-        x_pos, y_pos = (x*256)+x_adj, (y*dims[0]*dims[1])+y_adj
-        draw.rectangle((x_pos,y_pos,x_pos+(dims[1]*16),y_pos+(dims[0]*16)),outline=(255,255,255))
+        
+        imgs.append(img)
+        labels.append(label)
+        x_pos, y_pos, x_del, y_del = (x*256)+x_adj, (y*dims[0]*dims[1])+y_adj, dims[1]*16, dims[0]*16
+        
+        xys.append((x_pos,y_pos))
+        #draw.rectangle((x_pos,y_pos,x_pos+(dims[1]*16),y_pos+(dims[0]*16)),outline=(255,255,255))
         #draw.rectangle(((x*256)+x_adj, (y*dims[0]*dims[1])+y_adj))
         #layout_img.paste(img, ((x*256)+x_adj,(y*dims[0]*dims[1])+y_adj))
         layout_img.paste(img, (x_pos,y_pos))
-        print(x, y, '\t', (x*256)+x_adj, (y*dims[0]*dims[1])+y_adj, '\t', label, '\t', dir)
+        #draw.line(((x_pos,y_pos),(x_pos+x_del,y_pos)),width=3)  # up
+        #draw.line(((x_pos,y_pos+y_del),(x_pos+x_del,y_pos+y_del)),width=3)  # down
+        #draw.line(((x_pos,y_pos),(x_pos, y_pos+y_del)),width=3)  # left
+        #draw.line(((x_pos+x_del,y_pos),(x_pos+x_del,y_pos+y_del)),width=3)  # right
+        if not args.nolines:
+            draw_lines(layout_img,x,y, x_adj, y_adj,label)
+        print(x, y, '\t', (x*256)+x_adj, (y*dims[0]*dims[1])+y_adj)
         print('\n'.join(segment),'\n')
+    if not args.nolines:
+        draw_dirs(layout_img, xys, labels)
     layout_img.save('layout_' + GAME + '_' + str(latent_dim) + '.png')
     sys.exit()
 elif GAME == 'lode':
-    rows, cols = random.randint(2,4), random.randint(2,4)
+    rows, cols = random.randint(2,2), random.randint(2,2)
     layout_img = Image.new('RGB',(cols*256, rows*(dims[0]*dims[1])))
+    imgs, labels, xys = [], [], []
     for y in range(rows):
         for x in range(cols):
             label = [0] * 4
@@ -333,12 +426,25 @@ elif GAME == 'lode':
             if x !=0 and x != cols-1 and y != 0 and y != rows-1:
                 label = [1,1,1,1]  # non perimeter cell
             z = sample_z()
-            label = get_label_tensor(label)
-            segment = get_segment_from_zc(model,z,label)
+            label_tensor = get_label_tensor(label)
+            segment = get_segment_from_zc(model,z,label_tensor)
             img = get_image_from_segment(segment)
             layout_img.paste(img, ((x*256),(y*dims[0]*dims[1])))
-            print(x, y, '\t', (x*256), (y*dims[0]*dims[1]), '\t', label)
-            print('\n'.join(segment),'\n')
+            imgs.append(img)
+            labels.append(label)
+            x_pos, y_pos, x_del, y_del = (x*256), (y*dims[0]*dims[1]), dims[1]*16, dims[0]*16
+        
+            xys.append((x_pos,y_pos))
+            layout_img.paste(img, (x_pos,y_pos))    
+            #draw.line(((x_pos,y_pos),(x_pos+x_del,y_pos)),width=3)  # up
+            #draw.line(((x_pos,y_pos+y_del),(x_pos+x_del,y_pos+y_del)),width=3)  # down
+            #draw.line(((x_pos,y_pos),(x_pos, y_pos+y_del)),width=3)  # left
+            #draw.line(((x_pos+x_del,y_pos),(x_pos+x_del,y_pos+y_del)),width=3)  # right
+            if not args.nolines:
+                draw_lines(layout_img,x,y, 0, 0,label)
+            
+    if not args.nolines:
+        draw_dirs(layout_img, xys, labels)
     layout_img.save('layout_' + GAME + '_' + str(latent_dim) + '.png')
     sys.exit()
         
@@ -410,11 +516,11 @@ print(width, height)
 print(x_adj, y_adj)
 #sys.exit()
 layout_img = Image.new('RGB',(width*256, height*(dims[0]*dims[1])))
-draw = ImageDraw.Draw(layout_img)
+#draw = ImageDraw.Draw(layout_img)
 #img.save('test.png')
 
-met_prob, zel_prob, mm_prob = args.met, args.zel, args.mm
 layout_segments = {}
+imgs, labels, xys = [], [], []
 for key in layout:
     print(layout[key])
     cell = layout[key]
@@ -430,45 +536,72 @@ for key in layout:
     print(label)
     z = sample_z()
     if 'blend' in GAME:
-        game_label = [0,0]
-        if random.random() > 0.5:
-            game_label[0] = 1
-        if random.random() > 0.5:
-            game_label[1] = 1
-        print('game: ', game_label)
-        label = game_label + label
-    label = get_label_tensor(label)
+        if GAME == 'blend_zelda_met_mm':
+            game_label = [0,0,0]
+            if random.random() <= g1:
+                game_label[0] = 1
+            if random.random() <= g2:
+                game_label[1] = 1
+            if random.random() <= g3:
+                game_label[2] = 1
+        else:
+            game_label = [0,0]
+            if random.random() <= g1:
+                game_label[0] = 1
+            if random.random() <= g2:
+                game_label[1] = 1
+            print('game: ', game_label)
+            
     if not args.multi:
-        segment = get_segment_from_zc(model,z,label)
+        if 'blend' in GAME:
+            label = game_label + label
+        label_tensor = get_label_tensor(label)
+        segment = get_segment_from_zc(model,z,label_tensor)
         img = get_image_from_segment(segment)
     else:
+        label_tensor = get_label_tensor(label)
         r = random.random()
         #this_game = 'met' if r < met_prob else 'zelda'
         this_game = random.choices(['met','zelda','mm'], [met_prob, zel_prob, mm_prob])[0]
-        segment = get_segment_from_zc(models[this_game],z,label,this_game)
+        print(this_game)
+        segment = get_segment_from_zc(models[this_game],z,label_tensor,this_game)
         if this_game == 'zelda':
             segment = pad_zelda(segment)
         img = get_image_from_segment(segment,this_game)
     x, y = key
+    imgs.append(img)
+    labels.append(label)
     x_pos, y_pos, x_del, y_del = (x*256)+x_adj, (y*dims[0]*dims[1])+y_adj, dims[1]*16, dims[0]*16
-    print('xp: ', x_pos, ' yp: ', y_pos)
-    
-    
-    #layout_img.paste(img, ((x*256)+x_adj,(y*dims[0]*dims[1])+y_adj))
+    xys.append((x_pos,y_pos))
     layout_img.paste(img, (x_pos,y_pos))
-    #draw.rectangle((x_pos,y_pos,x_pos+x_del,y_pos+y_del),outline=(255,255,255))
-    draw.line(((x_pos,y_pos),(x_pos+x_del,y_pos)),width=3)  # up
-    draw.line(((x_pos,y_pos+y_del),(x_pos+x_del,y_pos+y_del)),width=3)  # down
-    draw.line(((x_pos,y_pos),(x_pos, y_pos+y_del)),width=3)  # left
-    draw.line(((x_pos+x_del,y_pos),(x_pos+x_del,y_pos+y_del)),width=3)  # right
+    if not args.nolines:
+        draw_lines(layout_img,x,y, x_adj, y_adj,label)
     print(x, y, '\t', (x*256)+x_adj, (y*dims[0]*dims[1])+y_adj)
     print('\n'.join(segment),'\n')
     layout_segments[key] = segment
+if not args.nolines:
+    draw_dirs(layout_img, xys, labels)
 if args.multi:
     layout_img.save('layout_multi_met' + str(met_prob) + '_zel' + str(zel_prob) + '_mm' + str(mm_prob) + '_' + str(latent_dim) + '.png')
 else:
-    layout_img.save('layout_' + GAME + '_' + str(latent_dim) + '.png')
-
+    if 'blend' not in GAME:
+        layout_img.save('layout_' + GAME + '_' + str(latent_dim) + '.png')
+    elif GAME == 'blend_zelda_met_mm':
+        layout_img.save('layout_' + GAME + '_' + str(g1) + '_' + str(g2) + '_' + str(g3) + '_' + str(latent_dim) + '.png')
+    else:
+        layout_img.save('layout_' + GAME + '_' + str(g1) + '_' + str(g2) + '_' + str(latent_dim) + '.png')
+    """
+    elif GAME == 'blend_zelda_met':
+        layout_img.save('layout_' + GAME + '_' + str(met_prob) + '_zel' + str(zel_prob) + '_' + str(latent_dim) + '.png')
+    elif GAME == 'blend_met_mm':
+        layout_img.save('layout_' + GAME + '_' + str(met_prob) + '_mm' + str(mm_prob) + '_' + str(latent_dim) + '.png')
+    elif GAME == 'blend_zelda_mm':
+        layout_img.save('layout_' + GAME + '_zel' + str(zel_prob) + '_mm' + str(mm_prob) + '_' + str(latent_dim) + '.png')
+    elif GAME == 'blend_zelda_met_mm':
+        layout_img.save('layout_' + GAME + '_met' + str(met_prob) + '_zel' + str(zel_prob) + '_mm' + str(mm_prob) + '_' + str(latent_dim) + '.png')
+    elif GAME == 'blend_zelda_lode':
+        layout_img.save('layout_' + GAME + '_zel' + str(zel_prob) + '_lode' + str(lode_prob) + '_' + str(latent_dim) + '.png')
+    """
 if args.json:
     out_list = []
     for k, v in layout.items():

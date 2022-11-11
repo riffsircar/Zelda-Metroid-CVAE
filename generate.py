@@ -1,16 +1,8 @@
-from __future__ import print_function
 import argparse, random, torch, os, math, json, sys, re, pickle
 import torch.nn as nn
-import torch.nn.functional as F
-import torch.nn.parallel
-import torch.backends.cudnn as cudnn
 import torch.optim as optim
 import torch.utils.data
-import torchvision.datasets as dset
-import torchvision.transforms as transforms
 from torchvision.utils import save_image
-import torchvision.utils as vutils
-from torch.autograd import Variable
 import numpy as np
 import matplotlib.pyplot as plt
 from PIL import Image
@@ -33,11 +25,6 @@ zelda_folder = 'zelda_rooms/'
 dg_folder = 'dg_chunks_edited/'
 met_folder = 'met_chunks_all/'
 lode_folder = 'lode_chunks/'
-
-dg_mean = 0.01 #0.007690180346566041 #-0.013997895605728334
-dg_std = 0.18 #0.1813693650824676 #0.17229445236817564
-zelda_mean = -0.02 #-0.015203464839032359 #0.01327264206087219
-zelda_std = 0.17 #0.17129609054447595 #0.1696900470971206 
 
 folders = {'dg':dg_folder,'zelda':zelda_folder,'blend_dz':None, 'blend_dz_2':None, 'blend_dz_common':None,
 		   'blend_dz_common_full':None, 'met':met_folder, 'lode':lode_folder}
@@ -139,12 +126,6 @@ def get_segment_from_file(folder,f):
     chunk = open(folder + f, 'r').read().splitlines()
     chunk = [line.replace('\r\n','') for line in chunk]
     return chunk
-    out = []
-    for line in chunk:
-        line_list = list(line)
-        #line_list_map = [char2int[x] for x in line_list]
-        out.append(line_list)
-    return out
 
 def get_segment_from_zc(z,c):
 	level = model.decoder.decode(z,c)
@@ -179,7 +160,6 @@ door_label = [0,0,0,1]
 content = [0,0,0,1,0]
 totals = []
 
-
 copies, noncopies = 0, 0
 for j in range(1):
 	if j % 100 == 0:
@@ -193,12 +173,9 @@ for j in range(1):
 		doors = bin(i)[2:].zfill(4)
 		doors = [int(x) for x in doors]
 		label = doors #+ cont
-		#print(label)
 		label_tensor = get_label_tensor(label)
 		segment = get_segment_from_zc(z,label_tensor)
 		seg_string = '\n'.join(segment)
-		#print(seg_string)
-		#print(seg_string in input_levels,'\n')
 		if seg_string in input_levels:
 			copies += 1
 			print(label, ' copy')
@@ -228,7 +205,6 @@ for j in range(1):
 print(copies, '\t', noncopies)
 #print(totals)
 #print(np.mean(totals))
-sys.exit()
 z = torch.DoubleTensor(1,latent_dim).normal_(0,1).to(device)
 for game_label in [zelda_label,dg_label,blend_label]:
 	label = game_label + door_label
@@ -236,7 +212,6 @@ for game_label in [zelda_label,dg_label,blend_label]:
 	print(label)
 	segment = get_segment_from_zc(z,label_tensor)
 	print('\n'.join(segment),'\n')
-sys.exit()
 	
 if GAME.startswith('blend'):
 	zelda_label = [1,0]
